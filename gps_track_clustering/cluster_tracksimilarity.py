@@ -10,6 +10,18 @@ import math
 
 
 class ClusterTrackSimilarity(Cluster):
+    """ This subclass implements the abstract class Cluster()
+        Clustering Method:
+            The DBscan algorithm is used with a custom distance metric.
+            ...
+
+    Args:
+        tracks_gpx (list):       Description of parameter `tracks_gpx`.
+        summary (pd.DataFrame):  Each row in the DataFrame represents one activity.
+                                 Mandatory columns are: ['id', 'startpos_lat', 'startpos_lon',
+                                     'distance'  'duration'  'elevation_gain']
+        dir_cache (str):         path to caching dir. None: no caching.
+    """
 
     # Cluster DBSCAN
     _MIN_SAMPLES = 5         # Minimum size of cluster

@@ -1,30 +1,52 @@
+import time
+import pandas as pd
 from collections import Counter
 from geojson import Feature, Point, FeatureCollection
+from abc import ABC, abstractmethod
 
 
-class Cluster():
+class Cluster(ABC):
+    """ Abstract base class Cluster, is implemented by subclasses:
+        - ClusterStartLocs()
+        - ClusterTrackSimilarity()
+
+    Args:
+        summary (pd.DataFrame): Each row in the DataFrame represents one activity.
+                                Mandatory columns are: ['id', 'startpos_lat', 'startpos_lon',
+                                     'distance'  'duration'  'elevation_gain']
+    """
 
     def __init__(self, summary):
-        self.desc = ''
-
-        print('######################################################################')
-        print('######################################################################')
-        print('######################################################################')
+        """
+        Constructor
+        """
 
         # CONFIG
         pass
 
         # DATA
+        self.desc    = ''
         self.summary = summary
         self.labels  = None
         self.cluster = None
+        super().__init__()
 
+    @abstractmethod
     def _apply_cluster_algo(self):
-        # Function needs to be implemented by child classes
+        """
+        Abstract method needs to be implemented by subclasses
+        """
         pass
 
     def do_clustering(self):
-        # Apply the clustering algorithm
+        """
+        Executes the clustering process and assigns:
+            - colors
+            - names
+            - centers
+        """
+
+        # Apply the clustering algorithm implemented by subclasses
         labels, n_clusters, cluster_ids = self._apply_cluster_algo()
         self.summary.loc[:, 'cluster_id'] = labels
         self.labels = labels
@@ -54,14 +76,31 @@ class Cluster():
         for id, val in cluster.items():
             print('    - {} - {} - {}'.format(val['name'], val['n_activities'], val['color']))
 
-    def _set_cluster_summary(self, cluster):
-        map_id2name = {x: y['name'] for (x, y) in cluster.items()}
-        map_id2color = {x: y['color'] for (x, y) in cluster.items()}
-        self.summary['cluster_name'] = self.summary['cluster_id'].replace(map_id2name)
-        self.summary['cluster_color'] = self.summary['cluster_id'].replace(map_id2color)
+    def get_overview_table(self):
+        """
+        Creates a html table summarizing the clusters
+
+        Returns:
+            str: String representig the html code
+        """
+
+        table = pd.DataFrame.from_dict(self.cluster, orient='index')
+        table = table[['name', 'n_activities']].sort_values('name')
+        table = table.reset_index()
+        table = table.rename(columns={'name': 'Cluster Name',
+                                      'index': 'Cluster ID',
+                                      'n_activities': '# Tracks'})
+
+        return table.to_html(index=False, classes=["table-bordered", "table-striped", "table-hover"])
 
     def get_startloc_geojson(self):
-        # Create geojson from start locs
+        """
+        Create geojson from start locs
+
+        Returns:
+            geojson.FeatureCollection(): FeatureCollection containing all clustered start locations
+        """
+
         features = []
         for id, row in self.summary.iterrows():
             cluster_id = row.cluster_id
@@ -74,6 +113,10 @@ class Cluster():
         return feature_collection
 
     def get_cluster_centers_list(self):
+        """
+        Returns a string representation of all start locations
+        """
+
         centers = []
         for id, val in self.cluster.items():
             if id == -1:
@@ -83,6 +126,9 @@ class Cluster():
         return centers
 
     def _get_cluster_centers(self):
+        """
+        Returns a dict representation of all start locations
+        """
         centers = {}
         for cluster_id, group in self.summary.groupby('cluster_id'):
             if cluster_id == -1:
@@ -93,6 +139,10 @@ class Cluster():
         return centers
 
     def _get_cluster_colors(self, cluster_ids):
+        """
+        Assigns to each cluster a distiguishable color.
+        Not clustered will be black
+        """
         import random
         import colorsys
 
@@ -108,7 +158,6 @@ class Cluster():
 
         rainbow = getDistinctColors(len(cluster_ids) + 1)
         random.shuffle(rainbow)
-        # breakpoint()
 
         cols = {}
         for cluster_id in cluster_ids:
@@ -119,6 +168,9 @@ class Cluster():
         return cols
 
     def _get_cluster_names(self, start_ids):
+        """
+        Assigns to each cluster a name based on the closest city.
+        """
         from geopy.point import Point
         from geopy.geocoders import ArcGIS
 
@@ -135,8 +187,16 @@ class Cluster():
             p1 = Point(lat_mean, lon_mean)
 
             # Get city name of this location
-            geolocator = ArcGIS()
-            city = geolocator.reverse(p1).raw['City']
+            attempts = 0
+            while attempts < 3:
+                try:
+                    geolocator = ArcGIS()
+                    city = geolocator.reverse(p1).raw['City']
+                    break
+                except Exception:
+                    attempts += 1
+                    time.sleep(3)
+                    print('Call to geopy.ArcGIS() failed, retry...')
 
             # Get mean distance
             dist_str = str(round(data[data['cluster_id'] == cluster_id]['distance'].mean() / 1000, 2))
@@ -152,6 +212,9 @@ class Cluster():
         return map_id2name
 
     def _get_cluster_names_simple(self, start_ids):
+        """
+        Assigns to each cluster a simple name
+        """
         map_id2name = {}
         for cluster_id in start_ids:
             if cluster_id == -1:
@@ -160,3 +223,12 @@ class Cluster():
             map_id2name[cluster_id] = 'Cluster_{}'.format(cluster_id)
 
         return map_id2name
+
+    def _set_cluster_summary(self, cluster):
+        """
+        Set cluster information to self.summary object
+        """
+        map_id2name = {x: y['name'] for (x, y) in cluster.items()}
+        map_id2color = {x: y['color'] for (x, y) in cluster.items()}
+        self.summary['cluster_name'] = self.summary['cluster_id'].replace(map_id2name)
+        self.summary['cluster_color'] = self.summary['cluster_id'].replace(map_id2color)
