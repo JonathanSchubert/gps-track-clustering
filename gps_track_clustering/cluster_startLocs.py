@@ -3,7 +3,7 @@ from sklearn.cluster import DBSCAN
 
 
 class ClusterStartLocs(Cluster):
-    """ This subclass implements the abstract class Cluster()
+    """ This subclass extends the abstract class Cluster()
         Clustering Method:
             The start locations of all activities will be clustered by using the DBscan algorithm.
             Two parameters can be used to tune the results. _EPS indicated how close the locations

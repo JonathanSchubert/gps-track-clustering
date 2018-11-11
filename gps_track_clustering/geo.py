@@ -8,7 +8,6 @@ def align_two_tracks(track1, track2, gap_penalty):
     """
     Needleman-Wunsch algorithm adapted for gps tracks.
     """
-    # print("Aligning tracks")
 
     def similarity(p1, p2):
         d = gpxpy.geo.distance(p1.latitude, p1.longitude, p1.elevation,
@@ -29,6 +28,7 @@ def align_two_tracks(track1, track2, gap_penalty):
             delete = f[i - 1][j] + gap_penalty
             insert = f[i][j - 1] + gap_penalty
             f[i, j] = max(match, max(delete, insert))
+
     # backtrack to create alignment
     a1 = []
     a2 = []
@@ -59,9 +59,9 @@ def interpolate_distance(points, distance):
 
     Only latitude and longitude are interpolated; time and elavation are not
     interpolated and should not be relied upon.
+
+    TODO: Interpolate elevation and time.
     """
-    # TODO: Interpolate elevation and time.
-    # print("Distributing points evenly every {} meters".format(distance))
 
     d = 0
     i = 0
